@@ -1,6 +1,5 @@
-Project structure:
+# Technical Design
+View: https://github.com/tunguyensw/real-time-quiz/blob/main/design/Technical%20Design%20Document.pdf
 
-Design: - design
-Source: - quiz
-
-View [Technical Design Document.pdf](https://github.com/user-attachments/files/16155354/Technical.Design.Document.pdf)
+# Sourcce code
+View: https://github.com/tunguyensw/real-time-quiz/tree/main/quiz
