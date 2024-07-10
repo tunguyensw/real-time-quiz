@@ -1,0 +1,45 @@
+@startuml
+skinparam style strictuml
+actor "User" as user
+participant "E-Learning portal" as portal
+participant "API Gateway\n(Edge)" as edge
+
+participant "Leaderboard Service" as leaderboard_svc
+database "Message Broker \n(Redis)" as redis
+database "Leaderboard database" as board_db
+participant "Score Service" as score_svc
+
+score_svc --> redis: Pub: real-time data to channel (user-notification)
+
+autonumber
+group Display view
+user -> portal: View leader board (all user participations)
+portal -> portal: Init websocket connection
+portal -> edge: Fetch score data: GET: <b>/quizzes/score</b>
+edge -> leaderboard_svc: Send request
+
+alt Cache Hit
+leaderboard_svc -> redis: Get user score from cache
+redis --> leaderboard_svc: Response
+else
+leaderboard_svc -> board_db: Query query form db (user_score table)
+board_db --> leaderboard_svc: Response
+end
+leaderboard_svc --> edge: Response
+edge --> portal: Response
+portal -> portal: Display leader board
+
+
+end
+
+
+
+alt Update data model
+leaderboard_svc -> redis: Sub: real-time data from channel
+redis-->leaderboard_svc: Response
+leaderboard_svc -> portal: Websocket send data to client
+portal -> leaderboard_svc: Subscribe to websocket server
+portal-> portal: Update data model (score data)
+end
+
+@enduml

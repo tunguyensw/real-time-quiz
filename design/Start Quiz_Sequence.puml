@@ -1,0 +1,64 @@
+@startuml
+skinparam style strictuml
+actor "User" as user
+participant "E-Learning portal" as portal
+participant "API Gateway\n(Edge)" as edge
+participant "Quiz Service" as quiz_svc
+participant "Score Service" as score_svc
+queue "Kafa" as kafa
+database "Message Broker \n(Redis)" as redis
+database "Portal database" as portal_db
+
+group Join Quiz
+autonumber
+user -> portal: Enter quiz id to join
+portal -> edge: Send request:<b>GET /quizzes?quiz_no=22355</b>
+edge -> quiz_svc: Send request
+quiz_svc -> portal_db: Send query request
+portal_db --> quiz_svc: Response
+quiz_svc --> edge: Response: quiz info
+edge --> portal: Response
+portal -> portal: Display quiz info
+user -> portal: Start quiz
+portal -> edge: Send request: <b>POST: /quizes/join</b>
+edge ->quiz_svc: Send request
+quiz_svc -> quiz_svc: Validate quiz
+note right portal_db: Create record to quiz_participation table
+quiz_svc -> portal_db: Create quiz participation: status (PENDING)
+portal_db --> quiz_svc: Response
+quiz_svc -> quiz_svc: Fetch potential question
+quiz_svc --> edge: Response: question
+edge --> portal: Response
+portal -> portal: Display question
+
+end
+
+group Submit Question
+user -> portal: Submit answer for a question
+portal -> edge: Send request: <b>POST /api/quizzes/submit</b>
+edge -> quiz_svc: Send request
+alt In transaction
+note right portal_db: Create record to quiz_answer table
+quiz_svc -> portal_db: Create quiz answer
+quiz_svc -> kafa: Publish event: QuizSubmitted
+end
+score_svc -> kafa: Consume topic
+alt In transaction
+kafa --> score_svc: Acks
+note right portal_db: Update score to quiz_participation table
+score_svc -> portal_db: Update score
+score_svc -> kafa: Publish event: ScoreUpdated
+note right redis: Key is user-score, value is list data type [user_id,username,score]
+end
+score_svc -> redis: Update latest user's score to cache
+redis --> score_svc: Response
+note right score_svc: Should retry on failure
+score_svc -> redis: Broadcash real-time data to channel (user-notification)
+redis --> score_svc: Response
+end
+
+kafa --> quiz_svc: Acks
+quiz_svc -> quiz_svc: Fetch potential question
+quiz_svc --> edge: Response: next question
+edge -> portal: Display next question
+@enduml
